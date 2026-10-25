@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TV Indoor - Prefeitura de Juara</title>
+  <!-- Fonte dos textos sobre as fotos (fica guardada para uso sem internet) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;800&display=swap" rel="stylesheet">
+  <style>
+    /* ---------- Base: tela preta, sem cursor, sem rolagem ---------- */
+    * { cursor: none !important; box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000;
+      font-family: 'Montserrat', Arial, sans-serif; user-select: none; }
+
+    /* O "palco" sempre mede 1920x1080 e é ampliado/reduzido para caber na TV */
+    #palco { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px;
+      transform-origin: center; overflow: hidden; background: #000; }
+
+    /* Cada mídia fica numa camada; a nova aparece por cima com esmaecimento */
+    .camada { position: absolute; inset: 0; opacity: 0; transition: opacity .8s ease; overflow: hidden; }
+    .camada.visivel { opacity: 1; }
+    .cheia { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+    .moldura { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .fundo { position: absolute; inset: 0; width: 100%; height: 100%;
+      filter: blur(40px) brightness(.55); transform: scale(1.2); }
+    .area { position: absolute; overflow: hidden; background: #000; }
+    .youtube iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+    /* Zoom lento nas fotos (efeito "Ken Burns") */
+    .zoom { animation: zoomLento var(--dur, 10s) linear forwards; }
+    @keyframes zoomLento { from { transform: scale(1); } to { transform: scale(1.08); } }
+
+    /* ---------- Texto sobre a foto ("Texto na tela") ---------- */
+    .legenda { position: absolute; left: 0; right: 0; bottom: 0; padding: 140px 90px 70px;
+      background: linear-gradient(transparent, rgba(0,0,0,.75)); color: #fff; }
+    .legenda .faixa { width: 0; height: 8px; background: #f9c80e; margin-bottom: 22px;
+      animation: faixa .7s .5s ease-out forwards; }
+    .legenda h1 { margin: 0; font-size: 64px; font-weight: 800; line-height: 1.1;
+      text-shadow: 0 3px 12px rgba(0,0,0,.5); opacity: 0; transform: translateY(40px);
+      animation: sobe .8s .7s ease-out forwards; }
+    .legenda p { margin: 16px 0 0; font-size: 36px; font-weight: 500; opacity: 0;
+      transform: translateY(30px); animation: sobe .8s 1s ease-out forwards; }
+    .legenda.saindo { transition: opacity .6s, transform .6s; opacity: 0; transform: translateY(30px); }
+    /* Dentro da área estreita (mídia vertical) o texto fica menor */
+    .area .legenda { padding: 100px 36px 40px; }
+    .area .legenda h1 { font-size: 40px; }
+    .area .legenda p { font-size: 26px; }
+    @keyframes faixa { to { width: 140px; } }
+    @keyframes sobe { to { opacity: 1; transform: none; } }
+
+    /* ---------- Telas de aviso e de espera ---------- */
+    #aviso { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+      flex-direction: column; background: #102a12; color: #fff; text-align: center; padding: 5vw; z-index: 10; }
+    #aviso h1 { font-size: 5vw; margin: 0 0 2vw; }
+    #aviso p { font-size: 2.4vw; margin: 0; opacity: .85; line-height: 1.5; }
+    .espera-texto { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      color: #555; font-size: 48px; background: #e1e1e1; }
+
+    /* ---------- Modo diagnóstico (?debug=1 no endereço) ---------- */
+    #debug { position: fixed; left: 8px; bottom: 8px; max-width: 60vw; background: rgba(0,0,0,.75);
+      color: #0f0; font: 13px/1.4 monospace; padding: 8px; white-space: pre-wrap; z-index: 20; display: none; }
+  </style>
+</head>
+<body>
+  <div id="palco"></div>
+  <div id="aviso"><h1 id="aviso-titulo"></h1><p id="aviso-texto"></p></div>
+  <div id="debug"></div>
+
+  <!-- Leitor de PDF (pdf.js). Carregado no próprio navegador, guardado para uso offline -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js" crossorigin="anonymous"></script>
+  <script src="config.js"></script>
+  <script src="player.js"></script>
+</body>
+</html>
