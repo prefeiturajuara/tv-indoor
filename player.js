@@ -33,8 +33,12 @@ const estado = {
   falhasSeguidas: 0,
   baixando: false,
   codigoInvalido: false,
-  timerAtualizacao: null
+  timerAtualizacao: null,
+  conhecidos: null,        // ids já vistos nesta TV (para detectar novidades)
+  novidades: [],           // ids novos que devem passar logo em seguida
+  retomar: null            // de onde o loop continua depois das novidades
 };
+const CHAVE_CONHECIDOS = 'tvindoor_conhecidos_' + CODIGO;
 
 // =====================================================================
 //  Utilidades
@@ -152,12 +156,38 @@ async function atualizarPrograma() {
   estado.offsetRelogio = resp.agora - Date.now();
   estado.programa = resp;
   try { localStorage.setItem(CHAVE_PROGRAMA, JSON.stringify(resp)); } catch (e) { /* */ }
+  registrarNovidades(resp);
   log(`Programação: ${resp.itens.length} itens para "${resp.tv.nome}"`);
   agendarAtualizacao(resp.config.intervalo || 5);
 
   await prepararMoldura();
   if (estado.emEspera || !estado.chaveAtual) proximo();
   baixarPendentes().then(limparArquivosAntigos);
+}
+
+/**
+ * Novidades: mídias que acabaram de entrar na programação passam logo depois
+ * da que está na tela (sem esperar o loop dar a volta inteira).
+ */
+function registrarNovidades(p) {
+  const atuais = p.itens.map((i) => i.id);
+  if (estado.conhecidos === null) {
+    // Primeira programação desta TV: nada é "novidade"
+    estado.conhecidos = new Set(atuais);
+  } else {
+    atuais.forEach((id) => {
+      if (!estado.conhecidos.has(id)) {
+        estado.conhecidos.add(id);
+        if (!estado.novidades.includes(id)) estado.novidades.push(id);
+        log('Novidade na programação:', id.slice(0, 6));
+      }
+    });
+  }
+  // Esquece o que saiu da programação (se voltar, conta como novidade de novo)
+  const setAtuais = new Set(atuais);
+  estado.conhecidos = new Set([...estado.conhecidos].filter((id) => setAtuais.has(id)));
+  estado.novidades = estado.novidades.filter((id) => setAtuais.has(id));
+  try { localStorage.setItem(CHAVE_CONHECIDOS, JSON.stringify([...estado.conhecidos])); } catch (e) { /* */ }
 }
 
 // =====================================================================
@@ -264,8 +294,19 @@ function proximo() {
     mostrarEspera(token, 30000);
     return;
   }
-  const atual = lista.findIndex((it) => it.chave === estado.chaveAtual);
-  const item = lista[(atual + 1) % lista.length];
+  let item;
+  const iNovidade = estado.novidades.findIndex((id) => lista.some((it) => it.id === id));
+  if (iNovidade !== -1) {
+    // Há novidade já baixada: mostra agora e guarda o ponto do loop para retomar
+    const id = estado.novidades.splice(iNovidade, 1)[0];
+    item = lista.find((it) => it.id === id);
+    if (!estado.retomar) estado.retomar = { chave: estado.chaveAtual };
+  } else {
+    const base = estado.retomar ? estado.retomar.chave : estado.chaveAtual;
+    estado.retomar = null;
+    const atual = lista.findIndex((it) => it.chave === base);
+    item = lista[(atual + 1) % lista.length];
+  }
   estado.chaveAtual = item.chave;
   estado.emEspera = false;
   log('Exibindo:', item.tipo, '-', item.titulo);
@@ -601,6 +642,10 @@ async function iniciar() {
 
   // 1) Começa com a última programação guardada (funciona sem internet)
   carregarVersoes();
+  try {
+    const c = JSON.parse(localStorage.getItem(CHAVE_CONHECIDOS) || 'null');
+    if (Array.isArray(c)) estado.conhecidos = new Set(c);
+  } catch (e) { /* */ }
   try {
     const salvo = JSON.parse(localStorage.getItem(CHAVE_PROGRAMA) || 'null');
     if (salvo) {
